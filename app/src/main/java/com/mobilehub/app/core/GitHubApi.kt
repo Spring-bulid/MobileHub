@@ -49,6 +49,7 @@ data class GhIssue(
     val title: String,
     val state: String,
     val body: String,
+    val bodyHtml: String,
     val userLogin: String,
     val userAvatar: String,
     val comments: Int,
@@ -67,6 +68,7 @@ data class GhComment(
     val userLogin: String,
     val userAvatar: String,
     val body: String,
+    val bodyHtml: String,
     val createdAt: String,
 )
 
@@ -105,6 +107,9 @@ data class GhBranch(val name: String)
 object GitHubApi {
 
     private const val BASE = "https://api.github.com"
+
+    /** 附带 body_html（GitHub 官方渲染）的媒体类型 */
+    private const val FULL_JSON = "application/vnd.github.full+json"
 
     @Volatile
     var token: String = ""
@@ -181,6 +186,7 @@ object GitHubApi {
             title = o.optString("title"),
             state = o.optString("state"),
             body = o.optString("body").takeIf { it != "null" } ?: "",
+            bodyHtml = o.optString("body_html").takeIf { it != "null" } ?: "",
             userLogin = user?.optString("login") ?: "",
             userAvatar = user?.optString("avatar_url") ?: "",
             comments = o.optInt("comments"),
@@ -203,6 +209,7 @@ object GitHubApi {
             userLogin = user?.optString("login") ?: "",
             userAvatar = user?.optString("avatar_url") ?: "",
             body = o.optString("body"),
+            bodyHtml = o.optString("body_html").takeIf { it != "null" } ?: "",
             createdAt = o.optString("created_at"),
         )
     }
@@ -256,6 +263,12 @@ object GitHubApi {
 
     suspend fun readme(owner: String, name: String): String {
         val r = get("/repos/$owner/$name/readme", accept = "application/vnd.github.raw+json")
+        return if (r.ok) r.body else ""
+    }
+
+    /** GitHub 官方渲染的 README HTML，与网页版一致 */
+    suspend fun readmeHtml(owner: String, name: String): String {
+        val r = get("/repos/$owner/$name/readme", accept = "application/vnd.github.html+json")
         return if (r.ok) r.body else ""
     }
 
@@ -351,19 +364,19 @@ object GitHubApi {
             .map { it.copy(isPullRequest = true) }
 
     suspend fun issue(owner: String, name: String, number: Int): GhIssue? {
-        val r = get("/repos/$owner/$name/issues/$number")
+        val r = get("/repos/$owner/$name/issues/$number", accept = FULL_JSON)
         if (!r.ok) return null
         return runCatching { parseIssue(JSONObject(r.body)) }.getOrNull()
     }
 
     suspend fun pull(owner: String, name: String, number: Int): GhIssue? {
-        val r = get("/repos/$owner/$name/pulls/$number")
+        val r = get("/repos/$owner/$name/pulls/$number", accept = FULL_JSON)
         if (!r.ok) return null
         return runCatching { parseIssue(JSONObject(r.body)).copy(isPullRequest = true) }.getOrNull()
     }
 
     suspend fun comments(owner: String, name: String, number: Int): List<GhComment> {
-        val r = get("/repos/$owner/$name/issues/$number/comments?per_page=100")
+        val r = get("/repos/$owner/$name/issues/$number/comments?per_page=100", accept = FULL_JSON)
         if (!r.ok) return emptyList()
         return runCatching {
             val arr = JSONArray(r.body)

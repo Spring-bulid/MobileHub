@@ -22,6 +22,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,13 +53,16 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -67,16 +71,21 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun MainScreen(nav: Nav) {
     var tab by remember { mutableIntStateOf(0) }
+    val scrollBehavior = MiuixScrollBehavior()
+
+    val title = when (tab) {
+        0 -> "主页"
+        1 -> "通知"
+        2 -> "探索"
+        else -> "我的"
+    }
 
     Scaffold(
         topBar = {
-            SmallTopAppBar(
-                title = when (tab) {
-                    0 -> "主页"
-                    1 -> "通知"
-                    2 -> "探索"
-                    else -> "我的"
-                },
+            TopAppBar(
+                title = title,
+                largeTitle = title,
+                scrollBehavior = scrollBehavior,
             )
         },
         bottomBar = {
@@ -88,11 +97,12 @@ fun MainScreen(nav: Nav) {
             }
         },
     ) { padding ->
+        val contentModifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
         when (tab) {
-            0 -> HomeTab(nav, padding)
-            1 -> NotificationsTab(nav, padding)
-            2 -> ExploreTab(nav, padding)
-            else -> ProfileTab(nav, padding)
+            0 -> HomeTab(nav, padding, contentModifier)
+            1 -> NotificationsTab(nav, padding, contentModifier)
+            2 -> ExploreTab(nav, padding, contentModifier)
+            else -> ProfileTab(nav, padding, contentModifier)
         }
     }
 }
@@ -102,7 +112,7 @@ fun MainScreen(nav: Nav) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun HomeTab(nav: Nav, padding: PaddingValues) {
+private fun HomeTab(nav: Nav, padding: PaddingValues, modifier: Modifier = Modifier) {
     var loading by remember { mutableStateOf(true) }
     var repos by remember { mutableStateOf(listOf<GhRepo>()) }
     var issues by remember { mutableStateOf(listOf<GhIssue>()) }
@@ -116,7 +126,7 @@ private fun HomeTab(nav: Nav, padding: PaddingValues) {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 12.dp),
     ) {
         item {
@@ -149,7 +159,7 @@ private fun HomeTab(nav: Nav, padding: PaddingValues) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun NotificationsTab(nav: Nav, padding: PaddingValues) {
+private fun NotificationsTab(nav: Nav, padding: PaddingValues, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(true) }
     var showAll by remember { mutableIntStateOf(0) }
@@ -164,7 +174,7 @@ private fun NotificationsTab(nav: Nav, padding: PaddingValues) {
     LaunchedEffect(showAll) { reload() }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 12.dp),
     ) {
         item {
@@ -217,7 +227,7 @@ private fun NotificationsTab(nav: Nav, padding: PaddingValues) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun ExploreTab(nav: Nav, padding: PaddingValues) {
+private fun ExploreTab(nav: Nav, padding: PaddingValues, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
     var mode by remember { mutableIntStateOf(0) }
@@ -242,7 +252,7 @@ private fun ExploreTab(nav: Nav, padding: PaddingValues) {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 12.dp),
     ) {
         item {
@@ -276,15 +286,7 @@ private fun ExploreTab(nav: Nav, padding: PaddingValues) {
             }
         }
         if (!searched) {
-            item {
-                Text(
-                    text = "热门仓库",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = GhColors.gray,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                )
-            }
+            item { SmallTitle(text = "热门仓库") }
         }
         if (loading) {
             item { LoadingBox() }
@@ -307,7 +309,7 @@ private fun ExploreTab(nav: Nav, padding: PaddingValues) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun ProfileTab(nav: Nav, padding: PaddingValues) {
+private fun ProfileTab(nav: Nav, padding: PaddingValues, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var me by remember { mutableStateOf(GitHubApi.me) }
     var starred by remember { mutableStateOf(listOf<GhRepo>()) }
@@ -320,7 +322,7 @@ private fun ProfileTab(nav: Nav, padding: PaddingValues) {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 12.dp),
     ) {
         item {
@@ -385,15 +387,7 @@ private fun ProfileTab(nav: Nav, padding: PaddingValues) {
                 }
             }
         }
-        item {
-            Text(
-                text = "已加星标",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = GhColors.gray,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-            )
-        }
+        item { SmallTitle(text = "已加星标") }
         if (loading) {
             item { LoadingBox() }
         } else {

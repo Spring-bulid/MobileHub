@@ -45,6 +45,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -160,15 +161,7 @@ fun UserProfileScreen(nav: Nav, login: String) {
                 }
             }
 
-            item {
-                Text(
-                    text = "仓库 (${repos.size})",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = GhColors.gray,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                )
-            }
+            item { SmallTitle(text = "仓库 (${repos.size})") }
             if (repos.isEmpty()) {
                 item { EmptyBox("暂无公开仓库") }
             }

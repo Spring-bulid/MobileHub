@@ -41,6 +41,7 @@ import com.mobilehub.app.core.GitHubApi
 import com.mobilehub.app.ui.Avatar
 import com.mobilehub.app.ui.EmptyBox
 import com.mobilehub.app.ui.GhColors
+import com.mobilehub.app.ui.GhMarkdown
 import com.mobilehub.app.ui.IssueRow
 import com.mobilehub.app.ui.LoadingBox
 import com.mobilehub.app.ui.Octicons
@@ -81,7 +82,7 @@ fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
         repo = GitHubApi.repo(owner, name)
         starred = GitHubApi.isStarred(owner, name)
         watching = GitHubApi.isWatching(owner, name)
-        readme = GitHubApi.readme(owner, name)
+        readme = GitHubApi.readmeHtml(owner, name)
     }
 
     LaunchedEffect(tab, issueState) {
@@ -162,12 +163,17 @@ fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
                 0 -> item {
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
-                        insideMargin = PaddingValues(14.dp),
+                        insideMargin = PaddingValues(2.dp),
                     ) {
                         if (readme.isBlank()) {
-                            Text(text = "README 加载中或不存在...", fontSize = 13.sp, color = GhColors.gray)
+                            Text(
+                                text = "README 加载中或不存在...",
+                                fontSize = 13.sp,
+                                color = GhColors.gray,
+                                modifier = Modifier.padding(14.dp),
+                            )
                         } else {
-                            MarkdownLite(readme)
+                            GhMarkdown(readme)
                         }
                     }
                 }

@@ -33,6 +33,7 @@ import com.mobilehub.app.core.GhUser
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.Duration
@@ -328,35 +329,15 @@ fun UserRow(user: GhUser, onClick: () -> Unit) {
     }
 }
 
-/** 简易分段选项卡 (仿 GitHub Mobile 顶部过滤) */
+/** 分段选项卡：miuix 原生轮廓样式 TabRow */
 @Composable
 fun SegmentTabs(tabs: List<String>, selected: Int, onSelect: (Int) -> Unit) {
-    Row(
+    TabRowWithContour(
+        tabs = tabs,
+        selectedTabIndex = selected,
+        onTabSelected = onSelect,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(MiuixTheme.colorScheme.surfaceContainer),
-    ) {
-        tabs.forEachIndexed { i, t ->
-            val active = i == selected
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(3.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (active) MiuixTheme.colorScheme.surface else Color.Transparent)
-                    .clickable { onSelect(i) }
-                    .padding(vertical = 7.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = t,
-                    fontSize = 13.sp,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (active) MiuixTheme.colorScheme.onSurface else GhColors.gray,
-                )
-            }
-        }
-    }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
 }

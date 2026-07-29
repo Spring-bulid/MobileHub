@@ -34,6 +34,7 @@ import com.mobilehub.app.core.GitHubApi
 import com.mobilehub.app.ui.Avatar
 import com.mobilehub.app.ui.EmptyBox
 import com.mobilehub.app.ui.GhColors
+import com.mobilehub.app.ui.GhMarkdown
 import com.mobilehub.app.ui.LabelChip
 import com.mobilehub.app.ui.LoadingBox
 import com.mobilehub.app.ui.Octicons
@@ -45,6 +46,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
@@ -156,7 +158,10 @@ fun IssueDetailScreen(nav: Nav, owner: String, repo: String, number: Int, isPr: 
                             it0.labels.take(4).forEach { (n, c) -> LabelChip(n, c) }
                         }
                     }
-                    if (it0.body.isNotBlank()) {
+                    if (it0.bodyHtml.isNotBlank()) {
+                        Spacer(Modifier.height(12.dp))
+                        GhMarkdown(it0.bodyHtml, contentPadding = 0)
+                    } else if (it0.body.isNotBlank()) {
                         Spacer(Modifier.height(12.dp))
                         MarkdownLite(it0.body)
                     }
@@ -214,15 +219,7 @@ fun IssueDetailScreen(nav: Nav, owner: String, repo: String, number: Int, isPr: 
                 }
             }
 
-            item {
-                Text(
-                    text = "评论 (${comments.size})",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = GhColors.gray,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                )
-            }
+            item { SmallTitle(text = "评论 (${comments.size})") }
 
             if (comments.isEmpty()) {
                 item { EmptyBox("还没有评论") }
@@ -246,7 +243,11 @@ fun IssueDetailScreen(nav: Nav, owner: String, repo: String, number: Int, isPr: 
                         Text(text = relativeTime(c.createdAt), fontSize = 12.sp, color = GhColors.gray)
                     }
                     Spacer(Modifier.height(8.dp))
-                    MarkdownLite(c.body)
+                    if (c.bodyHtml.isNotBlank()) {
+                        GhMarkdown(c.bodyHtml, contentPadding = 0)
+                    } else {
+                        MarkdownLite(c.body)
+                    }
                 }
             }
 
