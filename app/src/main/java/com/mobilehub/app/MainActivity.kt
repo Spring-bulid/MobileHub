@@ -1,6 +1,7 @@
 package com.mobilehub.app
 
 import android.os.Bundle
+import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -47,6 +48,9 @@ class Nav(private val stack: androidx.compose.runtime.snapshots.SnapshotStateLis
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // WebView 嵌在外部滚动容器里时，默认只光栅化自身视口附近区域，
+        // 远端区块滚到时才画会白闪；必须在创建任何 WebView 之前开启整页绘制
+        WebView.enableSlowWholeDocumentDraw()
         enableEdgeToEdge()
 
         val saved = TokenStore.load(this)

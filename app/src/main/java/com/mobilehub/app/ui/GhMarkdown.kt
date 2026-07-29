@@ -16,9 +16,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.abs
 
 /**
@@ -33,11 +35,15 @@ fun GhMarkdown(html: String, modifier: Modifier = Modifier, contentPadding: Int 
     val context = LocalContext.current
     var contentHeight by remember { mutableFloatStateOf(0f) }
 
+    // 透明背景 + 硬件加速的 WebView 在滚动合成时会闪，改用与卡片一致的不透明背景
+    val bgArgb = MiuixTheme.colorScheme.surface.toArgb()
+    val bgHex = String.format("#%06X", 0xFFFFFF and bgArgb)
+
     val css = remember(dark) {
         val file = if (dark) "github-markdown-dark.css" else "github-markdown-light.css"
         context.assets.open(file).bufferedReader().use { it.readText() }
     }
-    val page = remember(html, css, contentPadding) { buildPage(css, html, contentPadding) }
+    val page = remember(html, css, contentPadding, bgHex) { buildPage(css, html, contentPadding, bgHex) }
 
     AndroidView(
         factory = { ctx ->
@@ -46,7 +52,6 @@ fun GhMarkdown(html: String, modifier: Modifier = Modifier, contentPadding: Int 
                 settings.domStorageEnabled = false
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 addJavascriptInterface(object {
                     @JavascriptInterface
                     fun onHeight(h: Float) {
@@ -68,6 +73,7 @@ fun GhMarkdown(html: String, modifier: Modifier = Modifier, contentPadding: Int 
             }
         },
         update = { web ->
+            web.setBackgroundColor(bgArgb)
             if (web.tag != page.hashCode()) {
                 web.tag = page.hashCode()
                 web.loadDataWithBaseURL("https://github.com/render", page, "text/html", "utf-8", null)
@@ -81,7 +87,7 @@ fun GhMarkdown(html: String, modifier: Modifier = Modifier, contentPadding: Int 
     )
 }
 
-private fun buildPage(css: String, html: String, contentPadding: Int): String = """
+private fun buildPage(css: String, html: String, contentPadding: Int, bgHex: String): String = """
 <!DOCTYPE html>
 <html>
 <head>
@@ -89,9 +95,9 @@ private fun buildPage(css: String, html: String, contentPadding: Int): String = 
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>$css</style>
 <style>
-  html, body { margin: 0; padding: 0; background: transparent; }
+  html, body { margin: 0; padding: 0; background: $bgHex; }
   .markdown-body {
-    background: transparent;
+    background: $bgHex;
     padding: ${contentPadding}px;
     font-size: 15px;
     overflow-wrap: break-word;
