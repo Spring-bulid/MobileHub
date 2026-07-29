@@ -20,6 +20,7 @@ import com.mobilehub.app.ui.screens.LoginScreen
 import com.mobilehub.app.ui.screens.MainScreen
 import com.mobilehub.app.ui.screens.NewIssueScreen
 import com.mobilehub.app.ui.screens.RepoDetailScreen
+import com.mobilehub.app.ui.screens.SettingsScreen
 import com.mobilehub.app.ui.screens.UserProfileScreen
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
@@ -35,6 +36,7 @@ sealed interface Screen {
     data class UserProfile(val login: String) : Screen
     data class CodeBrowser(val owner: String, val repo: String, val path: String, val ref: String) : Screen
     data class FileViewer(val owner: String, val repo: String, val path: String, val ref: String) : Screen
+    data object Settings : Screen
 }
 
 /** 简单回退栈导航 */
@@ -85,5 +87,6 @@ fun App(startLoggedIn: Boolean) {
         is Screen.UserProfile -> UserProfileScreen(nav, s.login)
         is Screen.CodeBrowser -> CodeBrowserScreen(nav, s.owner, s.repo, s.path, s.ref)
         is Screen.FileViewer -> FileViewerScreen(nav, s.owner, s.repo, s.path, s.ref)
+        is Screen.Settings -> SettingsScreen(nav)
     }
 }

@@ -100,6 +100,13 @@ data class GhCommit(
 
 data class GhBranch(val name: String)
 
+data class GhWorkflow(
+    val id: Long,
+    val name: String,
+    val path: String,
+    val state: String,
+)
+
 // ---------------------------------------------------------------------------
 // API 客户端：全部请求经由 Rust 核心执行
 // ---------------------------------------------------------------------------
@@ -288,6 +295,43 @@ object GitHubApi {
         val refQ = if (ref.isBlank()) "" else "?ref=$ref"
         val r = get("/repos/$owner/$name/contents/$path$refQ", accept = "application/vnd.github.raw+json")
         return if (r.ok) r.body else "加载失败 (HTTP ${r.status})"
+    }
+
+    // ------------------------ Actions 工作流（YML 一键编译） ------------------------
+
+    /** 列出仓库的 GitHub Actions 工作流（.github/workflows 目录下的 yml） */
+    suspend fun workflows(owner: String, name: String): List<GhWorkflow> {
+        val r = get("/repos/$owner/$name/actions/workflows?per_page=50")
+        if (!r.ok) return emptyList()
+        return runCatching {
+            val arr = JSONObject(r.body).optJSONArray("workflows") ?: JSONArray()
+            (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map {
+                GhWorkflow(
+                    it.optLong("id"),
+                    it.optString("name"),
+                    it.optString("path"),
+                    it.optString("state"),
+                )
+            }.filter { it.path.endsWith(".yml") || it.path.endsWith(".yaml") }
+        }.getOrDefault(emptyList())
+    }
+
+    /**
+     * 触发 workflow_dispatch 一键编译。
+     * 返回 null 表示成功，否则返回错误描述（422 = 该 yml 未声明 workflow_dispatch 触发器）。
+     */
+    suspend fun dispatchWorkflow(owner: String, name: String, workflowId: Long, ref: String): String? {
+        val r = post(
+            "/repos/$owner/$name/actions/workflows/$workflowId/dispatches",
+            JSONObject().put("ref", ref),
+        )
+        if (r.ok) return null
+        return when (r.status) {
+            403 -> "没有权限（token 需 workflow 权限）"
+            404 -> "工作流不存在或无权访问"
+            422 -> "该工作流未声明手动触发（workflow_dispatch）"
+            else -> "触发失败 (HTTP ${r.status})"
+        }
     }
 
     suspend fun commits(owner: String, name: String, page: Int = 1): List<GhCommit> {

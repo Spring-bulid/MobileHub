@@ -37,6 +37,7 @@ import com.mobilehub.app.Screen
 import com.mobilehub.app.core.GhCommit
 import com.mobilehub.app.core.GhIssue
 import com.mobilehub.app.core.GhRepo
+import com.mobilehub.app.core.GhWorkflow
 import com.mobilehub.app.core.GitHubApi
 import com.mobilehub.app.ui.Avatar
 import com.mobilehub.app.ui.EmptyBox
@@ -59,6 +60,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -77,12 +79,15 @@ fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
     var tab by remember { mutableIntStateOf(0) }
     var tabLoading by remember { mutableStateOf(false) }
     var issueState by remember { mutableIntStateOf(0) }
+    var workflows by remember { mutableStateOf(listOf<GhWorkflow>()) }
+    var dispatchHint by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         repo = GitHubApi.repo(owner, name)
         starred = GitHubApi.isStarred(owner, name)
         watching = GitHubApi.isWatching(owner, name)
         readme = GitHubApi.readmeHtml(owner, name)
+        workflows = GitHubApi.workflows(owner, name)
     }
 
     LaunchedEffect(tab, issueState) {
@@ -152,6 +157,22 @@ fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
         val sectionTabs: @Composable () -> Unit = {
             SegmentTabs(listOf("自述", "议题", "合并", "提交", "代码"), tab) { tab = it }
         }
+        // 查到 .github/workflows 里有 yml 工作流就提示支持一键编译
+        val ymlCard: @Composable () -> Unit = {
+            if (workflows.isNotEmpty()) {
+                WorkflowCard(
+                    workflows = workflows,
+                    hint = dispatchHint,
+                    onDispatch = { wf ->
+                        scope.launch {
+                            dispatchHint = "正在触发 ${wf.name} ..."
+                            val err = GitHubApi.dispatchWorkflow(owner, name, wf.id, repo?.defaultBranch ?: "main")
+                            dispatchHint = err ?: "已触发 ${wf.name}，可到仓库 Actions 页查看进度"
+                        }
+                    },
+                )
+            }
+        }
 
         if (tab == 0) {
             // README 不再嵌进外部列表：超高 WebView 被动滚动时光栅化不及时会白闪，
@@ -162,6 +183,7 @@ fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
                     .padding(top = padding.calculateTopPadding()),
             ) {
                 header()
+                ymlCard()
                 sectionTabs()
                 Card(
                     modifier = Modifier
@@ -192,6 +214,7 @@ fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
                 ),
             ) {
                 item { header() }
+                item { ymlCard() }
                 item { sectionTabs() }
                 when (tab) {
                     1, 2 -> {
@@ -377,3 +400,72 @@ fun MarkdownLite(text: String) {
 }
 
 fun Modifier.androidClickable(onClick: () -> Unit): Modifier = this.clickable(onClick = onClick)
+
+/** YML 一键编译提示卡：展示工作流列表，点击运行触发 workflow_dispatch */
+@Composable
+private fun WorkflowCard(
+    workflows: List<GhWorkflow>,
+    hint: String,
+    onDispatch: (GhWorkflow) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
+        insideMargin = PaddingValues(14.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().androidClickable { expanded = !expanded },
+        ) {
+            Icon(
+                imageVector = Octicons.Play,
+                contentDescription = null,
+                tint = GhColors.open,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = "支持 YML 一键编译",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = "检测到 ${workflows.size} 个 GitHub Actions 工作流",
+                    fontSize = 12.sp,
+                    color = GhColors.gray,
+                )
+            }
+            Icon(
+                imageVector = if (expanded) Octicons.Close else Octicons.ChevronRight,
+                contentDescription = null,
+                tint = GhColors.gray,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        if (expanded) {
+            workflows.forEach { wf ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(text = wf.name, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            text = wf.path.removePrefix(".github/workflows/"),
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = GhColors.gray,
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(text = "编译", onClick = { onDispatch(wf) })
+                }
+            }
+        }
+        if (hint.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(text = hint, fontSize = 12.sp, color = GhColors.link)
+        }
+    }
+}

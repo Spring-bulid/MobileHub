@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -462,13 +463,6 @@ private fun ProfileTab(nav: Nav, padding: PaddingValues, modifier: Modifier = Mo
                 }
             }
         }
-        item { SmallTitle(text = "底部栏样式") }
-        item {
-            SegmentTabs(
-                listOf("经典导航栏", "液态玻璃悬浮"),
-                if (AppPrefs.liquidBar.value) 1 else 0,
-            ) { AppPrefs.setLiquidBar(context, it == 1) }
-        }
         item { SmallTitle(text = "已加星标") }
         if (loading) {
             item { LoadingBox() }
@@ -476,6 +470,36 @@ private fun ProfileTab(nav: Nav, padding: PaddingValues, modifier: Modifier = Mo
             if (starred.isEmpty()) item { EmptyBox("还没有加星标的仓库") }
             items(starred.size) { i ->
                 RepoRow(starred[i]) { nav.push(Screen.RepoDetail(starred[i].owner, starred[i].name)) }
+            }
+        }
+        item { SmallTitle(text = "更多") }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                insideMargin = PaddingValues(0.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { nav.push(com.mobilehub.app.Screen.Settings) }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    Icon(
+                        imageVector = Octicons.Gear,
+                        contentDescription = null,
+                        tint = GhColors.gray,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(text = "设置", fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    Icon(
+                        imageVector = Octicons.ChevronRight,
+                        contentDescription = null,
+                        tint = GhColors.gray,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
     }
