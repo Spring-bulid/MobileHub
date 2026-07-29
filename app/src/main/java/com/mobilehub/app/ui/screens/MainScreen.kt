@@ -152,7 +152,7 @@ fun MainScreen(nav: Nav) {
                         Octicons.Search to "探索",
                         Octicons.Person to "我的",
                     ),
-                    selected = tab,
+                    selected = { tab },
                     onSelect = { tab = it },
                     backdrop = backdrop,
                     modifier = Modifier
