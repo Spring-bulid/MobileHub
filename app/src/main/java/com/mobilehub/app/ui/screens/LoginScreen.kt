@@ -89,24 +89,25 @@ fun LoginScreen(onLoggedIn: () -> Unit) {
             Spacer(Modifier.height(40.dp))
 
             Card(modifier = Modifier.fillMaxWidth(), insideMargin = androidx.compose.foundation.layout.PaddingValues(16.dp)) {
-                TextField(
-                    value = token,
-                    onValueChange = { token = it.trim() },
-                    label = "Personal Access Token",
-                    useLabelAsPlaceholder = true,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    TextField(
+                        value = token,
+                        onValueChange = { token = it.trim() },
+                        label = "Personal Access Token",
+                        useLabelAsPlaceholder = true,
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(10.dp))
                     TextButton(text = "粘贴", onClick = {
                         val t = clipboard.getText()?.text?.trim().orEmpty()
                         if (t.isNotBlank()) token = t
                     })
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
                     text = "支持 classic 与 fine-grained token，建议勾选 repo、notifications、user 权限。Token 将由本机 C 保险库加密保存。",
                     fontSize = 12.sp,
