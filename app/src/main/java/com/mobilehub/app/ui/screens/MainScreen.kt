@@ -1,5 +1,12 @@
 package com.mobilehub.app.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -137,11 +144,22 @@ fun MainScreen(nav: Nav) {
                     .fillMaxSize()
                     .then(if (liquid) Modifier.layerBackdrop(backdrop) else Modifier),
             ) {
-                when (tab) {
-                    0 -> HomeTab(nav, effectivePadding, contentModifier)
-                    1 -> NotificationsTab(nav, effectivePadding, contentModifier)
-                    2 -> ExploreTab(nav, effectivePadding, contentModifier)
-                    else -> ProfileTab(nav, effectivePadding, contentModifier)
+                // 按切换方向轻滑动 + 淡入淡出，避免硬切
+                AnimatedContent(
+                    targetState = tab,
+                    transitionSpec = {
+                        val dir = if (targetState > initialState) 1 else -1
+                        (slideInHorizontally(tween(300)) { it / 8 * dir } + fadeIn(tween(300))) togetherWith
+                            (slideOutHorizontally(tween(300)) { -it / 8 * dir } + fadeOut(tween(150)))
+                    },
+                    label = "tabContent",
+                ) { t ->
+                    when (t) {
+                        0 -> HomeTab(nav, effectivePadding, contentModifier)
+                        1 -> NotificationsTab(nav, effectivePadding, contentModifier)
+                        2 -> ExploreTab(nav, effectivePadding, contentModifier)
+                        else -> ProfileTab(nav, effectivePadding, contentModifier)
+                    }
                 }
             }
             if (liquid) {
