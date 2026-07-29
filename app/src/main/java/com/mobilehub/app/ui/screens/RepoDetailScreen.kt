@@ -134,6 +134,8 @@ fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
                 top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding() + 16.dp,
             ),
+            // 边缘拉伸回弹的 RenderEffect 会让硬件加速的 WebView 闪烁，关掉
+            overscrollEffect = null,
         ) {
             item {
                 RepoHeader(

@@ -94,6 +94,8 @@ fun IssueDetailScreen(nav: Nav, owner: String, repo: String, number: Int, isPr: 
                 top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding() + 16.dp,
             ),
+            // 正文/评论内嵌 WebView，边缘拉伸回弹会引发闪烁，关掉
+            overscrollEffect = null,
         ) {
             if (loading) {
                 item { LoadingBox() }
