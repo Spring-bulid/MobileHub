@@ -26,11 +26,14 @@ import kotlin.math.abs
 /**
  * 渲染 GitHub 官方输出的 HTML（README / 议题正文 / 评论），
  * 套用 github-markdown-css，视觉与 github.com 完全一致。
- * 高度由页面内 JS 上报，自适应内容。
+ *
+ * fillContainer = false：高度由页内 JS 上报，自适应内容，适合短正文嵌列表；
+ * fillContainer = true：填满容器并由 WebView 自己滚动，适合长 README，
+ * 避免超高 WebView 嵌外部列表引发的光栅化白闪。
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun GhMarkdown(html: String, modifier: Modifier = Modifier, contentPadding: Int = 16) {
+fun GhMarkdown(html: String, modifier: Modifier = Modifier, contentPadding: Int = 16, fillContainer: Boolean = false) {
     val dark = isSystemInDarkTheme()
     val context = LocalContext.current
     var contentHeight by remember { mutableFloatStateOf(0f) }
@@ -43,14 +46,16 @@ fun GhMarkdown(html: String, modifier: Modifier = Modifier, contentPadding: Int 
         val file = if (dark) "github-markdown-dark.css" else "github-markdown-light.css"
         context.assets.open(file).bufferedReader().use { it.readText() }
     }
-    val page = remember(html, css, contentPadding, bgHex) { buildPage(css, html, contentPadding, bgHex) }
+    val page = remember(html, css, contentPadding, bgHex, fillContainer) {
+        buildPage(css, html, contentPadding, bgHex, reportHeight = !fillContainer)
+    }
 
     AndroidView(
         factory = { ctx ->
             WebView(ctx).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = false
-                isVerticalScrollBarEnabled = false
+                isVerticalScrollBarEnabled = fillContainer
                 isHorizontalScrollBarEnabled = false
                 addJavascriptInterface(object {
                     @JavascriptInterface
@@ -79,15 +84,39 @@ fun GhMarkdown(html: String, modifier: Modifier = Modifier, contentPadding: Int 
                 web.loadDataWithBaseURL("https://github.com/render", page, "text/html", "utf-8", null)
             }
         },
-        modifier = modifier
-            .fillMaxWidth()
-            .height(if (contentHeight > 0f) contentHeight.dp else 1.dp)
-            // 首次高度未就绪前隐藏，避免加载过程白屏闪烁
-            .alpha(if (contentHeight > 0f) 1f else 0f),
+        modifier = if (fillContainer) {
+            modifier.fillMaxWidth()
+        } else {
+            modifier
+                .fillMaxWidth()
+                .height(if (contentHeight > 0f) contentHeight.dp else 1.dp)
+                // 首次高度未就绪前隐藏，避免加载过程白屏闪烁
+                .alpha(if (contentHeight > 0f) 1f else 0f)
+        },
     )
 }
 
-private fun buildPage(css: String, html: String, contentPadding: Int, bgHex: String): String = """
+private fun buildPage(css: String, html: String, contentPadding: Int, bgHex: String, reportHeight: Boolean): String {
+    val script = if (reportHeight) """
+<script>
+  var last = 0;
+  function report() {
+    // 只量文章自身高度；scrollHeight 会受视口影响，与宿主设高互相触发导致闪烁
+    var h = Math.ceil(document.getElementById('ghmd').getBoundingClientRect().height);
+    if (h > 0 && Math.abs(h - last) > 1) {
+      last = h;
+      MobileHub.onHeight(h);
+    }
+  }
+  window.addEventListener('load', report);
+  new ResizeObserver(report).observe(document.getElementById('ghmd'));
+  for (const img of document.images) {
+    img.addEventListener('load', report);
+    img.addEventListener('error', report);
+  }
+</script>
+""" else ""
+    return """
 <!DOCTYPE html>
 <html>
 <head>
@@ -111,23 +140,8 @@ private fun buildPage(css: String, html: String, contentPadding: Int, bgHex: Str
 <article class="markdown-body" id="ghmd">
 $html
 </article>
-<script>
-  var last = 0;
-  function report() {
-    // 只量文章自身高度；scrollHeight 会受视口影响，与宿主设高互相触发导致闪烁
-    var h = Math.ceil(document.getElementById('ghmd').getBoundingClientRect().height);
-    if (h > 0 && Math.abs(h - last) > 1) {
-      last = h;
-      MobileHub.onHeight(h);
-    }
-  }
-  window.addEventListener('load', report);
-  new ResizeObserver(report).observe(document.getElementById('ghmd'));
-  for (const img of document.images) {
-    img.addEventListener('load', report);
-    img.addEventListener('error', report);
-  }
-</script>
+$script
 </body>
 </html>
 """
+}

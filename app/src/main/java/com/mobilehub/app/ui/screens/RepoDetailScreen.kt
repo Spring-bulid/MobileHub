@@ -128,118 +128,133 @@ fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
             }
         },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                top = padding.calculateTopPadding(),
-                bottom = padding.calculateBottomPadding() + 16.dp,
-            ),
-            // 边缘拉伸回弹的 RenderEffect 会让硬件加速的 WebView 闪烁，关掉
-            overscrollEffect = null,
-        ) {
-            item {
-                RepoHeader(
-                    repo = repo,
-                    owner = owner,
-                    name = name,
-                    starred = starred,
-                    watching = watching,
-                    onOwnerClick = { nav.push(Screen.UserProfile(owner)) },
-                    onStar = {
-                        scope.launch {
-                            if (GitHubApi.setStar(owner, name, !starred)) starred = !starred
-                        }
-                    },
-                    onWatch = {
-                        scope.launch {
-                            if (GitHubApi.setWatch(owner, name, !watching)) watching = !watching
-                        }
-                    },
-                    onFork = { scope.launch { GitHubApi.forkRepo(owner, name) } },
-                )
+        val header: @Composable () -> Unit = {
+            RepoHeader(
+                repo = repo,
+                owner = owner,
+                name = name,
+                starred = starred,
+                watching = watching,
+                onOwnerClick = { nav.push(Screen.UserProfile(owner)) },
+                onStar = {
+                    scope.launch {
+                        if (GitHubApi.setStar(owner, name, !starred)) starred = !starred
+                    }
+                },
+                onWatch = {
+                    scope.launch {
+                        if (GitHubApi.setWatch(owner, name, !watching)) watching = !watching
+                    }
+                },
+                onFork = { scope.launch { GitHubApi.forkRepo(owner, name) } },
+            )
+        }
+        val sectionTabs: @Composable () -> Unit = {
+            SegmentTabs(listOf("自述", "议题", "合并", "提交", "代码"), tab) { tab = it }
+        }
+
+        if (tab == 0) {
+            // README 不再嵌进外部列表：超高 WebView 被动滚动时光栅化不及时会白闪，
+            // 改为固定头部 + WebView 自身滚动
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = padding.calculateTopPadding()),
+            ) {
+                header()
+                sectionTabs()
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
+                        .padding(top = 5.dp, bottom = padding.calculateBottomPadding() + 12.dp),
+                    insideMargin = PaddingValues(2.dp),
+                ) {
+                    if (readme.isBlank()) {
+                        Text(
+                            text = "README 加载中或不存在...",
+                            fontSize = 13.sp,
+                            color = GhColors.gray,
+                            modifier = Modifier.padding(14.dp),
+                        )
+                    } else {
+                        GhMarkdown(readme, modifier = Modifier.fillMaxSize(), fillContainer = true)
+                    }
+                }
             }
-            item {
-                SegmentTabs(listOf("自述", "议题", "合并", "提交", "代码"), tab) { tab = it }
-            }
-            when (tab) {
-                0 -> item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
-                        insideMargin = PaddingValues(2.dp),
-                    ) {
-                        if (readme.isBlank()) {
-                            Text(
-                                text = "README 加载中或不存在...",
-                                fontSize = 13.sp,
-                                color = GhColors.gray,
-                                modifier = Modifier.padding(14.dp),
-                            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = padding.calculateTopPadding(),
+                    bottom = padding.calculateBottomPadding() + 16.dp,
+                ),
+            ) {
+                item { header() }
+                item { sectionTabs() }
+                when (tab) {
+                    1, 2 -> {
+                        item { SegmentTabs(listOf("开放", "已关闭"), issueState) { issueState = it } }
+                        if (tabLoading) {
+                            item { LoadingBox() }
                         } else {
-                            GhMarkdown(readme)
-                        }
-                    }
-                }
-
-                1, 2 -> {
-                    item { SegmentTabs(listOf("开放", "已关闭"), issueState) { issueState = it } }
-                    if (tabLoading) {
-                        item { LoadingBox() }
-                    } else {
-                        val list = if (tab == 1) issues else pulls
-                        if (list.isEmpty()) item { EmptyBox(if (tab == 1) "没有议题" else "没有合并请求") }
-                        items(list.size) { i ->
-                            IssueRow(list[i]) {
-                                nav.push(Screen.IssueDetail(owner, name, list[i].number, list[i].isPullRequest))
-                            }
-                        }
-                    }
-                }
-
-                3 -> {
-                    if (tabLoading) {
-                        item { LoadingBox() }
-                    } else {
-                        if (commits.isEmpty()) item { EmptyBox("没有提交记录") }
-                        items(commits.size) { i ->
-                            val c = commits[i]
-                            Card(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
-                                insideMargin = PaddingValues(14.dp),
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Avatar(c.avatarUrl, size = 28.dp)
-                                    Spacer(Modifier.width(10.dp))
-                                    Column(Modifier.weight(1f)) {
-                                        Text(
-                                            text = c.message,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 2,
-                                        )
-                                        Spacer(Modifier.height(3.dp))
-                                        Text(
-                                            text = "${c.author} · ${relativeTime(c.date)}",
-                                            fontSize = 12.sp,
-                                            color = GhColors.gray,
-                                        )
-                                    }
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        text = c.sha,
-                                        fontSize = 12.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = GhColors.link,
-                                    )
+                            val list = if (tab == 1) issues else pulls
+                            if (list.isEmpty()) item { EmptyBox(if (tab == 1) "没有议题" else "没有合并请求") }
+                            items(list.size) { i ->
+                                IssueRow(list[i]) {
+                                    nav.push(Screen.IssueDetail(owner, name, list[i].number, list[i].isPullRequest))
                                 }
                             }
                         }
                     }
-                }
 
-                4 -> item {
-                    LaunchedEffect(Unit) {
-                        nav.push(Screen.CodeBrowser(owner, name, "", repo?.defaultBranch ?: ""))
-                        tab = 0
+                    3 -> {
+                        if (tabLoading) {
+                            item { LoadingBox() }
+                        } else {
+                            if (commits.isEmpty()) item { EmptyBox("没有提交记录") }
+                            items(commits.size) { i ->
+                                val c = commits[i]
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
+                                    insideMargin = PaddingValues(14.dp),
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Avatar(c.avatarUrl, size = 28.dp)
+                                        Spacer(Modifier.width(10.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                text = c.message,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                maxLines = 2,
+                                            )
+                                            Spacer(Modifier.height(3.dp))
+                                            Text(
+                                                text = "${c.author} · ${relativeTime(c.date)}",
+                                                fontSize = 12.sp,
+                                                color = GhColors.gray,
+                                            )
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            text = c.sha,
+                                            fontSize = 12.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = GhColors.link,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    4 -> item {
+                        LaunchedEffect(Unit) {
+                            nav.push(Screen.CodeBrowser(owner, name, "", repo?.defaultBranch ?: ""))
+                            tab = 0
+                        }
                     }
                 }
             }
