@@ -53,6 +53,8 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
+    // 液态玻璃背景效果（Kyant0/AndroidLiquidGlass）
+    implementation("io.github.kyant0:backdrop:2.0.0")
 }
 
 // navigationevent 1.1.2 的 AAR 元数据声明需要 AGP 8.9.1+，实际内容 8.7 可正常消费

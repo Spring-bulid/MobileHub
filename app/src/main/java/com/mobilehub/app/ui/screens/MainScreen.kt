@@ -1,13 +1,17 @@
 package com.mobilehub.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mobilehub.app.Nav
 import com.mobilehub.app.Screen
+import com.mobilehub.app.core.AppPrefs
 import com.mobilehub.app.core.GhIssue
 import com.mobilehub.app.core.GhNotification
 import com.mobilehub.app.core.GhRepo
@@ -40,6 +45,7 @@ import com.mobilehub.app.ui.Avatar
 import com.mobilehub.app.ui.EmptyBox
 import com.mobilehub.app.ui.GhColors
 import com.mobilehub.app.ui.IssueRow
+import com.mobilehub.app.ui.LiquidNavBar
 import com.mobilehub.app.ui.LoadingBox
 import com.mobilehub.app.ui.NotificationRow
 import com.mobilehub.app.ui.Octicons
@@ -47,6 +53,8 @@ import com.mobilehub.app.ui.RepoRow
 import com.mobilehub.app.ui.SegmentTabs
 import com.mobilehub.app.ui.UserRow
 import com.mobilehub.app.ui.countText
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -72,6 +80,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun MainScreen(nav: Nav) {
     var tab by remember { mutableIntStateOf(0) }
     val scrollBehavior = MiuixScrollBehavior()
+    val liquid = AppPrefs.liquidBar.value
 
     val title = when (tab) {
         0 -> "主页"
@@ -79,6 +88,17 @@ fun MainScreen(nav: Nav) {
         2 -> "探索"
         else -> "我的"
     }
+
+    // 液态玻璃需要把内容录制成背景层，背景色一并画入，避免透明像素
+    val bgColor = MiuixTheme.colorScheme.background
+    val backdropDraw = remember(bgColor) {
+        val block: androidx.compose.ui.graphics.drawscope.ContentDrawScope.() -> Unit = {
+            drawRect(bgColor)
+            drawContent()
+        }
+        block
+    }
+    val backdrop = rememberLayerBackdrop(onDraw = backdropDraw)
 
     Scaffold(
         topBar = {
@@ -89,20 +109,57 @@ fun MainScreen(nav: Nav) {
             )
         },
         bottomBar = {
-            NavigationBar {
-                NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = Octicons.Home, label = "主页")
-                NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = Octicons.Bell, label = "通知")
-                NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, icon = Octicons.Search, label = "探索")
-                NavigationBarItem(selected = tab == 3, onClick = { tab = 3 }, icon = Octicons.Person, label = "我的")
+            if (!liquid) {
+                NavigationBar {
+                    NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = Octicons.Home, label = "主页")
+                    NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = Octicons.Bell, label = "通知")
+                    NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, icon = Octicons.Search, label = "探索")
+                    NavigationBarItem(selected = tab == 3, onClick = { tab = 3 }, icon = Octicons.Person, label = "我的")
+                }
             }
         },
     ) { padding ->
         val contentModifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
-        when (tab) {
-            0 -> HomeTab(nav, padding, contentModifier)
-            1 -> NotificationsTab(nav, padding, contentModifier)
-            2 -> ExploreTab(nav, padding, contentModifier)
-            else -> ProfileTab(nav, padding, contentModifier)
+        val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        // 悬浮模式下 Scaffold 没有底栏，手动为内容留出悬浮栏的空间
+        val effectivePadding = if (liquid) {
+            PaddingValues(
+                top = padding.calculateTopPadding(),
+                bottom = navInset + 88.dp,
+            )
+        } else {
+            padding
+        }
+
+        Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .then(if (liquid) Modifier.layerBackdrop(backdrop) else Modifier),
+            ) {
+                when (tab) {
+                    0 -> HomeTab(nav, effectivePadding, contentModifier)
+                    1 -> NotificationsTab(nav, effectivePadding, contentModifier)
+                    2 -> ExploreTab(nav, effectivePadding, contentModifier)
+                    else -> ProfileTab(nav, effectivePadding, contentModifier)
+                }
+            }
+            if (liquid) {
+                LiquidNavBar(
+                    items = listOf(
+                        Octicons.Home to "主页",
+                        Octicons.Bell to "通知",
+                        Octicons.Search to "探索",
+                        Octicons.Person to "我的",
+                    ),
+                    selected = tab,
+                    onSelect = { tab = it },
+                    backdrop = backdrop,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = navInset + 12.dp),
+                )
+            }
         }
     }
 }
@@ -386,6 +443,13 @@ private fun ProfileTab(nav: Nav, padding: PaddingValues, modifier: Modifier = Mo
                     Text(text = "退出登录")
                 }
             }
+        }
+        item { SmallTitle(text = "底部栏样式") }
+        item {
+            SegmentTabs(
+                listOf("经典导航栏", "液态玻璃悬浮"),
+                if (AppPrefs.liquidBar.value) 1 else 0,
+            ) { AppPrefs.setLiquidBar(context, it == 1) }
         }
         item { SmallTitle(text = "已加星标") }
         if (loading) {

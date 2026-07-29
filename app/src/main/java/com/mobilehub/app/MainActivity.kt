@@ -10,6 +10,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import com.mobilehub.app.core.AppPrefs
 import com.mobilehub.app.core.GitHubApi
 import com.mobilehub.app.core.TokenStore
 import com.mobilehub.app.ui.screens.CodeBrowserScreen
@@ -55,6 +56,7 @@ class MainActivity : ComponentActivity() {
 
         val saved = TokenStore.load(this)
         if (saved != null) GitHubApi.token = saved
+        AppPrefs.load(this)
 
         setContent {
             val colors = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()
