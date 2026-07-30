@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import com.mobilehub.app.core.AppPrefs
 import com.mobilehub.app.core.GitHubApi
 import com.mobilehub.app.core.TokenStore
+import com.mobilehub.app.ui.screens.ActionsScreen
 import com.mobilehub.app.ui.screens.CodeBrowserScreen
 import com.mobilehub.app.ui.screens.FileViewerScreen
 import com.mobilehub.app.ui.screens.IssueDetailScreen
@@ -36,6 +37,7 @@ sealed interface Screen {
     data class UserProfile(val login: String) : Screen
     data class CodeBrowser(val owner: String, val repo: String, val path: String, val ref: String) : Screen
     data class FileViewer(val owner: String, val repo: String, val path: String, val ref: String) : Screen
+    data class Actions(val owner: String, val repo: String) : Screen
     data object Settings : Screen
 }
 
@@ -87,6 +89,7 @@ fun App(startLoggedIn: Boolean) {
         is Screen.UserProfile -> UserProfileScreen(nav, s.login)
         is Screen.CodeBrowser -> CodeBrowserScreen(nav, s.owner, s.repo, s.path, s.ref)
         is Screen.FileViewer -> FileViewerScreen(nav, s.owner, s.repo, s.path, s.ref)
+        is Screen.Actions -> ActionsScreen(nav, s.owner, s.repo)
         is Screen.Settings -> SettingsScreen(nav)
     }
 }

@@ -108,6 +108,17 @@ data class GhWorkflow(
     val state: String,
 )
 
+data class GhRun(
+    val id: Long,
+    val title: String,
+    val workflowName: String,
+    val runNumber: Int,
+    val status: String, // queued | in_progress | completed
+    val conclusion: String, // success | failure | cancelled ...
+    val branch: String,
+    val createdAt: String,
+)
+
 // ---------------------------------------------------------------------------
 // API 客户端：全部请求经由 Rust 核心执行
 // ---------------------------------------------------------------------------
@@ -378,6 +389,27 @@ object GitHubApi {
         val t = target ?: return "复刻仓库里暂未找到该工作流，稍后再试"
         onProgress("正在触发 $myLogin/${mine.name} 的 ${t.name} ...")
         return dispatchWorkflow(myLogin, mine.name, t.id, mine.defaultBranch)
+    }
+
+    /** 列出仓库最近的工作流运行记录，用于编译进度页 */
+    suspend fun workflowRuns(owner: String, name: String): List<GhRun> {
+        val r = get("/repos/$owner/$name/actions/runs?per_page=30")
+        if (!r.ok) return emptyList()
+        return runCatching {
+            val arr = JSONObject(r.body).optJSONArray("workflow_runs") ?: JSONArray()
+            (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map { o ->
+                GhRun(
+                    id = o.optLong("id"),
+                    title = o.optString("display_title").ifBlank { o.optString("name") },
+                    workflowName = o.optString("name"),
+                    runNumber = o.optInt("run_number"),
+                    status = o.optString("status"),
+                    conclusion = o.optString("conclusion"),
+                    branch = o.optString("head_branch"),
+                    createdAt = o.optString("created_at"),
+                )
+            }
+        }.getOrDefault(emptyList())
     }
 
     suspend fun commits(owner: String, name: String, page: Int = 1): List<GhCommit> {

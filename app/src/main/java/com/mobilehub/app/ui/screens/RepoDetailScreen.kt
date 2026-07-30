@@ -171,11 +171,21 @@ fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
                             if (isMine) {
                                 dispatchHint = "正在触发 ${wf.name} ..."
                                 val err = GitHubApi.dispatchWorkflow(owner, name, wf.id, repo?.defaultBranch ?: "main")
-                                dispatchHint = err ?: "已触发 ${wf.name}，可到仓库 Actions 页查看进度"
+                                if (err == null) {
+                                    dispatchHint = ""
+                                    nav.push(Screen.Actions(owner, name))
+                                } else {
+                                    dispatchHint = err
+                                }
                             } else {
                                 val err = GitHubApi.dispatchOnFork(owner, name, wf) { dispatchHint = it }
-                                dispatchHint = err
-                                    ?: "已在复刻仓库触发 ${wf.name}，可到自己仓库的 Actions 页查看进度"
+                                if (err == null) {
+                                    dispatchHint = ""
+                                    // 编译在自己的复刻仓库里运行，跳过去看进度
+                                    nav.push(Screen.Actions(GitHubApi.me?.login ?: owner, name))
+                                } else {
+                                    dispatchHint = err
+                                }
                             }
                         }
                     },
