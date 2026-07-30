@@ -157,17 +157,26 @@ fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
         val sectionTabs: @Composable () -> Unit = {
             SegmentTabs(listOf("自述", "议题", "合并", "提交", "代码"), tab) { tab = it }
         }
-        // 查到 .github/workflows 里有 yml 工作流就提示支持一键编译
+        // 查到 .github/workflows 里有 yml 工作流就提示支持一键编译；
+        // 自己的仓库直接触发，别人的仓库先复刻到自己账号再编译
+        val isMine = GitHubApi.me?.login.equals(owner, ignoreCase = true)
         val ymlCard: @Composable () -> Unit = {
             if (workflows.isNotEmpty()) {
                 WorkflowCard(
                     workflows = workflows,
+                    isMine = isMine,
                     hint = dispatchHint,
                     onDispatch = { wf ->
                         scope.launch {
-                            dispatchHint = "正在触发 ${wf.name} ..."
-                            val err = GitHubApi.dispatchWorkflow(owner, name, wf.id, repo?.defaultBranch ?: "main")
-                            dispatchHint = err ?: "已触发 ${wf.name}，可到仓库 Actions 页查看进度"
+                            if (isMine) {
+                                dispatchHint = "正在触发 ${wf.name} ..."
+                                val err = GitHubApi.dispatchWorkflow(owner, name, wf.id, repo?.defaultBranch ?: "main")
+                                dispatchHint = err ?: "已触发 ${wf.name}，可到仓库 Actions 页查看进度"
+                            } else {
+                                val err = GitHubApi.dispatchOnFork(owner, name, wf) { dispatchHint = it }
+                                dispatchHint = err
+                                    ?: "已在复刻仓库触发 ${wf.name}，可到自己仓库的 Actions 页查看进度"
+                            }
                         }
                     },
                 )
@@ -401,10 +410,11 @@ fun MarkdownLite(text: String) {
 
 fun Modifier.androidClickable(onClick: () -> Unit): Modifier = this.clickable(onClick = onClick)
 
-/** YML 一键编译提示卡：展示工作流列表，点击运行触发 workflow_dispatch */
+/** YML 一键编译提示卡：展示工作流列表；自己的仓库直接触发，别人的仓库复刻后编译 */
 @Composable
 private fun WorkflowCard(
     workflows: List<GhWorkflow>,
+    isMine: Boolean,
     hint: String,
     onDispatch: (GhWorkflow) -> Unit,
 ) {
@@ -431,7 +441,11 @@ private fun WorkflowCard(
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
-                    text = "检测到 ${workflows.size} 个 GitHub Actions 工作流",
+                    text = if (isMine) {
+                        "检测到 ${workflows.size} 个 GitHub Actions 工作流"
+                    } else {
+                        "检测到 ${workflows.size} 个工作流，复刻到自己账号后即可编译"
+                    },
                     fontSize = 12.sp,
                     color = GhColors.gray,
                 )
@@ -459,7 +473,7 @@ private fun WorkflowCard(
                         )
                     }
                     Spacer(Modifier.width(8.dp))
-                    TextButton(text = "编译", onClick = { onDispatch(wf) })
+                    TextButton(text = if (isMine) "编译" else "复刻并编译", onClick = { onDispatch(wf) })
                 }
             }
         }

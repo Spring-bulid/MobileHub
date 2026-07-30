@@ -1,6 +1,7 @@
 package com.mobilehub.app.core
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -332,6 +333,51 @@ object GitHubApi {
             422 -> "该工作流未声明手动触发（workflow_dispatch）"
             else -> "触发失败 (HTTP ${r.status})"
         }
+    }
+
+    /**
+     * 非本人仓库的一键编译：先复刻到自己账号，再在复刻仓库里触发同名工作流。
+     * 返回 null 表示成功，否则返回错误描述；过程状态通过 onProgress 回报。
+     */
+    suspend fun dispatchOnFork(
+        owner: String,
+        name: String,
+        wf: GhWorkflow,
+        onProgress: (String) -> Unit,
+    ): String? {
+        val myLogin = me?.login ?: return "未登录"
+        var fork = repo(myLogin, name)
+        if (fork?.isFork == false) return "你名下已有同名仓库 $myLogin/$name，无法复刻"
+        if (fork == null) {
+            onProgress("正在复刻到 $myLogin/$name ...")
+            val r = forkRepo(owner, name)
+            if (!r.ok) return "复刻失败 (HTTP ${r.status})"
+            // fork 是异步的，轮询等待仓库就绪
+            repeat(10) {
+                delay(1500)
+                if (fork == null) fork = repo(myLogin, name)
+            }
+            if (fork == null) return "复刻超时，请稍后到自己的仓库里手动触发"
+        }
+        val mine = fork!!
+        // fork 仓库默认禁用 Actions，先启用
+        onProgress("正在启用复刻仓库的 Actions ...")
+        raw(
+            "PUT",
+            "$BASE/repos/$myLogin/${mine.name}/actions/permissions",
+            JSONObject().put("enabled", true).put("allowed_actions", "all").toString(),
+        )
+        // 按 path 在复刻仓库里找同一个工作流（id 与原仓库不同，注册有延迟）
+        var target: GhWorkflow? = null
+        repeat(6) {
+            if (target == null) {
+                target = workflows(myLogin, mine.name).firstOrNull { it.path == wf.path }
+                if (target == null) delay(2000)
+            }
+        }
+        val t = target ?: return "复刻仓库里暂未找到该工作流，稍后再试"
+        onProgress("正在触发 $myLogin/${mine.name} 的 ${t.name} ...")
+        return dispatchWorkflow(myLogin, mine.name, t.id, mine.defaultBranch)
     }
 
     suspend fun commits(owner: String, name: String, page: Int = 1): List<GhCommit> {
