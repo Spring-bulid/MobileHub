@@ -184,36 +184,34 @@ fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
         // 自己的仓库直接触发，别人的仓库先复刻到自己账号再编译
         val isMine = GitHubApi.me?.login.equals(owner, ignoreCase = true)
         val ymlCard: @Composable () -> Unit = {
-            if (workflows.isNotEmpty()) {
-                WorkflowCard(
-                    workflows = workflows,
-                    isMine = isMine,
-                    hint = dispatchHint,
-                    onDispatch = { wf ->
-                        scope.launch {
-                            if (isMine) {
-                                dispatchHint = "正在触发 ${wf.name} ..."
-                                val err = GitHubApi.dispatchWorkflow(owner, name, wf.id, repo?.defaultBranch ?: "main")
-                                if (err == null) {
-                                    dispatchHint = ""
-                                    nav.push(Screen.Actions(owner, name))
-                                } else {
-                                    dispatchHint = err
-                                }
+            WorkflowCard(
+                workflows = workflows,
+                isMine = isMine,
+                hint = dispatchHint,
+                onDispatch = { wf ->
+                    scope.launch {
+                        if (isMine) {
+                            dispatchHint = "正在触发 ${wf.name} ..."
+                            val err = GitHubApi.dispatchWorkflow(owner, name, wf.id, repo?.defaultBranch ?: "main")
+                            if (err == null) {
+                                dispatchHint = ""
+                                nav.push(Screen.Actions(owner, name))
                             } else {
-                                val err = GitHubApi.dispatchOnFork(owner, name, wf) { dispatchHint = it }
-                                if (err == null) {
-                                    dispatchHint = ""
-                                    // 编译在自己的复刻仓库里运行，跳过去看进度
-                                    nav.push(Screen.Actions(GitHubApi.me?.login ?: owner, name))
-                                } else {
-                                    dispatchHint = err
-                                }
+                                dispatchHint = err
+                            }
+                        } else {
+                            val err = GitHubApi.dispatchOnFork(owner, name, wf) { dispatchHint = it }
+                            if (err == null) {
+                                dispatchHint = ""
+                                // 编译在自己的复刻仓库里运行，跳过去看进度
+                                nav.push(Screen.Actions(GitHubApi.me?.login ?: owner, name))
+                            } else {
+                                dispatchHint = err
                             }
                         }
-                    },
-                )
-            }
+                    }
+                },
+            )
         }
 
         if (tab == 0) {
@@ -443,7 +441,8 @@ fun MarkdownLite(text: String) {
 
 fun Modifier.androidClickable(onClick: () -> Unit): Modifier = this.clickable(onClick = onClick)
 
-/** YML 一键编译提示卡：展示工作流列表；自己的仓库直接触发，别人的仓库复刻后编译 */
+/** YML 一键编译提示卡：展示工作流列表；自己的仓库直接触发，别人的仓库复刻后编译。
+ * 即使仓库没有工作流也显示，引导用户了解该功能。 */
 @Composable
 private fun WorkflowCard(
     workflows: List<GhWorkflow>,
@@ -452,45 +451,50 @@ private fun WorkflowCard(
     onDispatch: (GhWorkflow) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val hasWorkflows = workflows.isNotEmpty()
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
         insideMargin = PaddingValues(14.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().androidClickable { expanded = !expanded },
+            modifier = Modifier.fillMaxWidth()
+                .then(if (hasWorkflows) Modifier.androidClickable { expanded = !expanded } else Modifier),
         ) {
             Icon(
                 imageVector = Octicons.Play,
                 contentDescription = null,
-                tint = GhColors.open,
+                tint = if (hasWorkflows) GhColors.open else GhColors.gray,
                 modifier = Modifier.size(20.dp),
             )
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = "支持 YML 一键编译",
+                    text = "YML 一键编译",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
-                    text = if (isMine) {
-                        "检测到 ${workflows.size} 个可手动触发的工作流"
-                    } else {
-                        "检测到 ${workflows.size} 个可触发工作流，复刻到自己账号后即可编译"
+                    text = when {
+                        !hasWorkflows && isMine -> "此仓库暂无 GitHub Actions 工作流，可在 .github/workflows/ 下添加 yml 文件"
+                        !hasWorkflows -> "此仓库暂无 GitHub Actions 工作流"
+                        isMine -> "检测到 ${workflows.size} 个工作流"
+                        else -> "检测到 ${workflows.size} 个工作流，复刻到自己账号后即可编译"
                     },
                     fontSize = 12.sp,
                     color = GhColors.gray,
                 )
             }
-            Icon(
-                imageVector = if (expanded) Octicons.Close else Octicons.ChevronRight,
-                contentDescription = null,
-                tint = GhColors.gray,
-                modifier = Modifier.size(16.dp),
-            )
+            if (hasWorkflows) {
+                Icon(
+                    imageVector = if (expanded) Octicons.Close else Octicons.ChevronRight,
+                    contentDescription = null,
+                    tint = GhColors.gray,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
         }
-        if (expanded) {
+        if (expanded && hasWorkflows) {
             workflows.forEach { wf ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

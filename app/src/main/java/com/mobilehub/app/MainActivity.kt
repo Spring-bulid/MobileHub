@@ -63,7 +63,12 @@ class MainActivity : ComponentActivity() {
         AppPrefs.load(this)
 
         setContent {
-            val colors = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()
+            val useDark = when (AppPrefs.themeMode.intValue) {
+                1 -> false  // 强制浅色
+                2 -> true   // 强制深色
+                else -> isSystemInDarkTheme()  // 跟随系统
+            }
+            val colors = if (useDark) darkColorScheme() else lightColorScheme()
             MiuixTheme(colors = colors) {
                 App(startLoggedIn = saved != null)
             }

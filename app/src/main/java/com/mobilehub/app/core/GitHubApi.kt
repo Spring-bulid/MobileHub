@@ -293,7 +293,8 @@ object GitHubApi {
 
     suspend fun contents(owner: String, name: String, path: String, ref: String): List<GhContent> {
         val refQ = if (ref.isBlank()) "" else "?ref=$ref"
-        val r = get("/repos/$owner/$name/contents/$path$refQ")
+        val pathPart = if (path.isBlank()) "" else "/$path"
+        val r = get("/repos/$owner/$name/contents$pathPart$refQ")
         if (!r.ok) return emptyList()
         return runCatching {
             val arr = JSONArray(r.body)
@@ -305,17 +306,18 @@ object GitHubApi {
 
     suspend fun fileRaw(owner: String, name: String, path: String, ref: String): String {
         val refQ = if (ref.isBlank()) "" else "?ref=$ref"
-        val r = get("/repos/$owner/$name/contents/$path$refQ", accept = "application/vnd.github.raw+json")
+        val pathPart = if (path.isBlank()) "" else "/$path"
+        val r = get("/repos/$owner/$name/contents$pathPart$refQ", accept = "application/vnd.github.raw+json")
         return if (r.ok) r.body else "加载失败 (HTTP ${r.status})"
     }
 
     // ------------------------ Actions 工作流（YML 一键编译） ------------------------
 
-    /** 列出仓库的 GitHub Actions 工作流（.github/workflows 目录下的 yml），仅返回含 workflow_dispatch 触发器的 */
+    /** 列出仓库的 GitHub Actions 工作流（.github/workflows 目录下的 yml） */
     suspend fun workflows(owner: String, name: String): List<GhWorkflow> {
         val r = get("/repos/$owner/$name/actions/workflows?per_page=50")
         if (!r.ok) return emptyList()
-        val all = runCatching {
+        return runCatching {
             val arr = JSONObject(r.body).optJSONArray("workflows") ?: JSONArray()
             (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map {
                 GhWorkflow(
@@ -326,11 +328,6 @@ object GitHubApi {
                 )
             }.filter { it.path.endsWith(".yml") || it.path.endsWith(".yaml") }
         }.getOrDefault(emptyList())
-        // 过滤：只保留声明了 workflow_dispatch 触发器的工作流
-        return all.filter { wf ->
-            val content = fileRaw(owner, name, wf.path, "")
-            content.contains("workflow_dispatch:")
-        }
     }
 
     /**
