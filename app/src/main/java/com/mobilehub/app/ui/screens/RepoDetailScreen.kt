@@ -1,5 +1,10 @@
 package com.mobilehub.app.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -494,23 +499,29 @@ private fun WorkflowCard(
                 )
             }
         }
-        if (expanded && hasWorkflows) {
-            workflows.forEach { wf ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(text = wf.name, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        Text(
-                            text = wf.path.removePrefix(".github/workflows/"),
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = GhColors.gray,
-                        )
+        AnimatedVisibility(
+            visible = expanded && hasWorkflows,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            Column(Modifier.fillMaxWidth()) {
+                workflows.forEach { wf ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(text = wf.name, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            Text(
+                                text = wf.path.removePrefix(".github/workflows/"),
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = GhColors.gray,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        TextButton(text = if (isMine) "编译" else "复刻并编译", onClick = { onDispatch(wf) })
                     }
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(text = if (isMine) "编译" else "复刻并编译", onClick = { onDispatch(wf) })
                 }
             }
         }

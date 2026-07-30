@@ -6,6 +6,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
@@ -45,9 +52,14 @@ sealed interface Screen {
 class Nav(private val stack: androidx.compose.runtime.snapshots.SnapshotStateList<Screen>) {
     val current: Screen get() = stack.last()
     val canPop: Boolean get() = stack.size > 1
-    fun push(s: Screen) = stack.add(s)
-    fun pop() { if (canPop) stack.removeAt(stack.lastIndex) }
-    fun reset(s: Screen) { stack.clear(); stack.add(s) }
+
+    /** 最近一次操作是否为前进（push），用于决定转场方向 */
+    var forward = true
+        private set
+
+    fun push(s: Screen) { forward = true; stack.add(s) }
+    fun pop() { if (canPop) { forward = false; stack.removeAt(stack.lastIndex) } }
+    fun reset(s: Screen) { forward = true; stack.clear(); stack.add(s) }
 }
 
 class MainActivity : ComponentActivity() {
@@ -85,16 +97,31 @@ fun App(startLoggedIn: Boolean) {
 
     BackHandler(enabled = nav.canPop) { nav.pop() }
 
-    when (val s = nav.current) {
-        is Screen.Login -> LoginScreen(onLoggedIn = { nav.reset(Screen.Main) })
-        is Screen.Main -> MainScreen(nav)
-        is Screen.RepoDetail -> RepoDetailScreen(nav, s.owner, s.name)
-        is Screen.IssueDetail -> IssueDetailScreen(nav, s.owner, s.repo, s.number, s.isPr)
-        is Screen.NewIssue -> NewIssueScreen(nav, s.owner, s.repo)
-        is Screen.UserProfile -> UserProfileScreen(nav, s.login)
-        is Screen.CodeBrowser -> CodeBrowserScreen(nav, s.owner, s.repo, s.path, s.ref)
-        is Screen.FileViewer -> FileViewerScreen(nav, s.owner, s.repo, s.path, s.ref)
-        is Screen.Actions -> ActionsScreen(nav, s.owner, s.repo)
-        is Screen.Settings -> SettingsScreen(nav)
+    // 页面跳转统一转场：前进从右侧滑入，返回向右滑出
+    AnimatedContent(
+        targetState = nav.current,
+        transitionSpec = {
+            if (nav.forward) {
+                (slideInHorizontally(tween(320)) { it / 4 } + fadeIn(tween(320))) togetherWith
+                    (slideOutHorizontally(tween(320)) { -it / 4 } + fadeOut(tween(200)))
+            } else {
+                (slideInHorizontally(tween(320)) { -it / 4 } + fadeIn(tween(320))) togetherWith
+                    (slideOutHorizontally(tween(320)) { it / 4 } + fadeOut(tween(200)))
+            }
+        },
+        label = "screenNav",
+    ) { s ->
+        when (s) {
+            is Screen.Login -> LoginScreen(onLoggedIn = { nav.reset(Screen.Main) })
+            is Screen.Main -> MainScreen(nav)
+            is Screen.RepoDetail -> RepoDetailScreen(nav, s.owner, s.name)
+            is Screen.IssueDetail -> IssueDetailScreen(nav, s.owner, s.repo, s.number, s.isPr)
+            is Screen.NewIssue -> NewIssueScreen(nav, s.owner, s.repo)
+            is Screen.UserProfile -> UserProfileScreen(nav, s.login)
+            is Screen.CodeBrowser -> CodeBrowserScreen(nav, s.owner, s.repo, s.path, s.ref)
+            is Screen.FileViewer -> FileViewerScreen(nav, s.owner, s.repo, s.path, s.ref)
+            is Screen.Actions -> ActionsScreen(nav, s.owner, s.repo)
+            is Screen.Settings -> SettingsScreen(nav)
+        }
     }
 }

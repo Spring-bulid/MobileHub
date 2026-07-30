@@ -1,5 +1,12 @@
 package com.mobilehub.app.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -48,10 +55,21 @@ fun SettingsScreen(nav: Nav) {
     // 用 Int 表示当前子页面：0=主列表, 1=外观, 2=底部栏
     var subPage by remember { mutableIntStateOf(0) }
 
-    when (subPage) {
-        0 -> SettingsMain(nav, onNavigate = { subPage = it })
-        1 -> AppearancePage { subPage = 0 }
-        2 -> BottomBarPage { subPage = 0 }
+    // 进入子页从右侧滑入，返回主列表向右滑出
+    AnimatedContent(
+        targetState = subPage,
+        transitionSpec = {
+            val dir = if (targetState > initialState) 1 else -1
+            (slideInHorizontally(tween(300)) { it / 4 * dir } + fadeIn(tween(300))) togetherWith
+                (slideOutHorizontally(tween(300)) { -it / 4 * dir } + fadeOut(tween(180)))
+        },
+        label = "settingsSubPage",
+    ) { page ->
+        when (page) {
+            0 -> SettingsMain(nav, onNavigate = { subPage = it })
+            1 -> AppearancePage { subPage = 0 }
+            2 -> BottomBarPage { subPage = 0 }
+        }
     }
 }
 
