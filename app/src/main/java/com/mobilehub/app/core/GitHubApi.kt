@@ -311,11 +311,11 @@ object GitHubApi {
 
     // ------------------------ Actions 工作流（YML 一键编译） ------------------------
 
-    /** 列出仓库的 GitHub Actions 工作流（.github/workflows 目录下的 yml） */
+    /** 列出仓库的 GitHub Actions 工作流（.github/workflows 目录下的 yml），仅返回含 workflow_dispatch 触发器的 */
     suspend fun workflows(owner: String, name: String): List<GhWorkflow> {
         val r = get("/repos/$owner/$name/actions/workflows?per_page=50")
         if (!r.ok) return emptyList()
-        return runCatching {
+        val all = runCatching {
             val arr = JSONObject(r.body).optJSONArray("workflows") ?: JSONArray()
             (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map {
                 GhWorkflow(
@@ -326,6 +326,11 @@ object GitHubApi {
                 )
             }.filter { it.path.endsWith(".yml") || it.path.endsWith(".yaml") }
         }.getOrDefault(emptyList())
+        // 过滤：只保留声明了 workflow_dispatch 触发器的工作流
+        return all.filter { wf ->
+            val content = fileRaw(owner, name, wf.path, "")
+            content.contains("workflow_dispatch:")
+        }
     }
 
     /**
@@ -373,11 +378,12 @@ object GitHubApi {
         val mine = fork!!
         // fork 仓库默认禁用 Actions，先启用
         onProgress("正在启用复刻仓库的 Actions ...")
-        raw(
+        val enableR = raw(
             "PUT",
             "$BASE/repos/$myLogin/${mine.name}/actions/permissions",
             JSONObject().put("enabled", true).put("allowed_actions", "all").toString(),
         )
+        if (!enableR.ok) return "启用 Actions 失败 (HTTP ${enableR.status})，请确认 token 是否有 workflow 权限"
         // 按 path 在复刻仓库里找同一个工作流（id 与原仓库不同，注册有延迟）
         var target: GhWorkflow? = null
         repeat(6) {

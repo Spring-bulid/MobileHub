@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,6 +40,7 @@ import com.mobilehub.app.ui.LabelChip
 import com.mobilehub.app.ui.LoadingBox
 import com.mobilehub.app.ui.Octicons
 import com.mobilehub.app.ui.relativeTime
+import com.mobilehub.app.ui.toast
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -57,6 +59,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  */
 @Composable
 fun IssueDetailScreen(nav: Nav, owner: String, repo: String, number: Int, isPr: Boolean) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var issue by remember { mutableStateOf<GhIssue?>(null) }
     var comments by remember { mutableStateOf(listOf<GhComment>()) }
@@ -182,9 +185,14 @@ fun IssueDetailScreen(nav: Nav, owner: String, repo: String, number: Int, isPr: 
                                 if (busy) return@Button
                                 busy = true
                                 scope.launch {
-                                    GitHubApi.mergePull(owner, repo, number)
+                                    val r = GitHubApi.mergePull(owner, repo, number)
                                     busy = false
-                                    refresh++
+                                    if (r.ok) {
+                                        toast(context, "合并成功")
+                                        refresh++
+                                    } else {
+                                        toast(context, "合并失败 (HTTP ${r.status})")
+                                    }
                                 }
                             },
                             colors = ButtonDefaults.buttonColorsPrimary(),
@@ -201,9 +209,14 @@ fun IssueDetailScreen(nav: Nav, owner: String, repo: String, number: Int, isPr: 
                                 if (busy) return@Button
                                 busy = true
                                 scope.launch {
-                                    GitHubApi.setIssueState(owner, repo, number, if (it0.state == "open") "closed" else "open")
+                                    val r = GitHubApi.setIssueState(owner, repo, number, if (it0.state == "open") "closed" else "open")
                                     busy = false
-                                    refresh++
+                                    if (r.ok) {
+                                        toast(context, if (it0.state == "open") "已关闭" else "已重新开放")
+                                        refresh++
+                                    } else {
+                                        toast(context, "操作失败 (HTTP ${r.status})")
+                                    }
                                 }
                             },
                             modifier = Modifier.weight(1f),
@@ -278,6 +291,9 @@ fun IssueDetailScreen(nav: Nav, owner: String, repo: String, number: Int, isPr: 
                                 if (r.ok) {
                                     draft = ""
                                     refresh++
+                                    toast(context, "评论已发布")
+                                } else {
+                                    toast(context, "发布失败 (HTTP ${r.status})")
                                 }
                             }
                         },
@@ -300,6 +316,7 @@ fun IssueDetailScreen(nav: Nav, owner: String, repo: String, number: Int, isPr: 
  */
 @Composable
 fun NewIssueScreen(nav: Nav, owner: String, repo: String) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val isRepoMode = owner.isBlank()
     var title by remember { mutableStateOf("") }
@@ -382,7 +399,17 @@ fun NewIssueScreen(nav: Nav, owner: String, repo: String) {
                                 GitHubApi.createIssue(owner, repo, title, body)
                             }
                             busy = false
-                            if (r.ok) nav.pop() else error = "操作失败 (HTTP ${r.status})"
+                            if (r.ok) {
+                                toast(context, if (isRepoMode) "仓库已创建" else "议题已提交")
+                                nav.pop()
+                            } else {
+                                error = when (r.status) {
+                                    422 -> if (isRepoMode) "仓库已存在或名称无效" else "提交内容有误，请检查"
+                                    401 -> "Token 无效或已过期"
+                                    403 -> "没有权限执行此操作"
+                                    else -> "操作失败 (HTTP ${r.status})"
+                                }
+                            }
                         }
                     },
                     enabled = title.isNotBlank() && !busy,

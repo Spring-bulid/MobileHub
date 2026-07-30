@@ -29,6 +29,7 @@ import com.mobilehub.app.core.GitHubApi
 import com.mobilehub.app.core.TokenStore
 import com.mobilehub.app.ui.GhColors
 import com.mobilehub.app.ui.Octicons
+import com.mobilehub.app.ui.toast
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -104,7 +105,11 @@ fun LoginScreen(onLoggedIn: () -> Unit) {
                     Spacer(Modifier.width(10.dp))
                     TextButton(text = "粘贴", onClick = {
                         val t = clipboard.getText()?.text?.trim().orEmpty()
-                        if (t.isNotBlank()) token = t
+                        if (t.isNotBlank()) {
+                            token = t
+                        } else {
+                            toast(context, "剪贴板为空，请先复制 Token")
+                        }
                     })
                 }
                 Spacer(Modifier.height(12.dp))

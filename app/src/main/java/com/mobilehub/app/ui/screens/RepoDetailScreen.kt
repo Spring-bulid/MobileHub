@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,6 +51,7 @@ import com.mobilehub.app.ui.SegmentTabs
 import com.mobilehub.app.ui.StatChip
 import com.mobilehub.app.ui.countText
 import com.mobilehub.app.ui.relativeTime
+import com.mobilehub.app.ui.toast
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -68,6 +70,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  */
 @Composable
 fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var repo by remember { mutableStateOf<GhRepo?>(null) }
     var readme by remember { mutableStateOf("") }
@@ -143,15 +146,35 @@ fun RepoDetailScreen(nav: Nav, owner: String, name: String) {
                 onOwnerClick = { nav.push(Screen.UserProfile(owner)) },
                 onStar = {
                     scope.launch {
-                        if (GitHubApi.setStar(owner, name, !starred)) starred = !starred
+                        if (GitHubApi.setStar(owner, name, !starred)) {
+                            starred = !starred
+                            toast(context, if (starred) "已加星标" else "已取消星标")
+                        } else {
+                            toast(context, "操作失败，请检查网络或权限")
+                        }
                     }
                 },
                 onWatch = {
                     scope.launch {
-                        if (GitHubApi.setWatch(owner, name, !watching)) watching = !watching
+                        if (GitHubApi.setWatch(owner, name, !watching)) {
+                            watching = !watching
+                            toast(context, if (watching) "已关注仓库" else "已取消关注")
+                        } else {
+                            toast(context, "操作失败，请检查网络或权限")
+                        }
                     }
                 },
-                onFork = { scope.launch { GitHubApi.forkRepo(owner, name) } },
+                onFork = {
+                    scope.launch {
+                        toast(context, "正在复刻...")
+                        val r = GitHubApi.forkRepo(owner, name)
+                        if (r.ok) {
+                            toast(context, "复刻成功，请到自己的仓库查看")
+                        } else {
+                            toast(context, "复刻失败 (HTTP ${r.status})")
+                        }
+                    }
+                },
             )
         }
         val sectionTabs: @Composable () -> Unit = {
@@ -452,9 +475,9 @@ private fun WorkflowCard(
                 )
                 Text(
                     text = if (isMine) {
-                        "检测到 ${workflows.size} 个 GitHub Actions 工作流"
+                        "检测到 ${workflows.size} 个可手动触发的工作流"
                     } else {
-                        "检测到 ${workflows.size} 个工作流，复刻到自己账号后即可编译"
+                        "检测到 ${workflows.size} 个可触发工作流，复刻到自己账号后即可编译"
                     },
                     fontSize = 12.sp,
                     color = GhColors.gray,

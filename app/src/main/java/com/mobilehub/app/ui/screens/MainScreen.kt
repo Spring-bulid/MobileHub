@@ -61,6 +61,7 @@ import com.mobilehub.app.ui.RepoRow
 import com.mobilehub.app.ui.SegmentTabs
 import com.mobilehub.app.ui.UserRow
 import com.mobilehub.app.ui.countText
+import com.mobilehub.app.ui.toast
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.launch
@@ -236,6 +237,7 @@ private fun HomeTab(nav: Nav, padding: PaddingValues, modifier: Modifier = Modif
 
 @Composable
 private fun NotificationsTab(nav: Nav, padding: PaddingValues, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(true) }
     var showAll by remember { mutableIntStateOf(0) }
@@ -263,8 +265,13 @@ private fun NotificationsTab(nav: Nav, padding: PaddingValues, modifier: Modifie
             ) {
                 TextButton(text = "全部标为已读", onClick = {
                     scope.launch {
-                        GitHubApi.markAllRead()
-                        reload()
+                        val ok = GitHubApi.markAllRead()
+                        if (ok) {
+                            toast(context, "已全部标为已读")
+                            reload()
+                        } else {
+                            toast(context, "操作失败，请检查网络")
+                        }
                     }
                 })
             }
@@ -276,7 +283,10 @@ private fun NotificationsTab(nav: Nav, padding: PaddingValues, modifier: Modifie
             items(list.size) { i ->
                 val n = list[i]
                 NotificationRow(n) {
-                    scope.launch { GitHubApi.markThreadRead(n.id) }
+                    scope.launch {
+                        GitHubApi.markThreadRead(n.id)
+                        reload()
+                    }
                     // subjectUrl 形如 https://api.github.com/repos/{o}/{r}/issues/{n}
                     val seg = n.subjectUrl.substringAfter("/repos/", "").split("/")
                     if (seg.size >= 4) {

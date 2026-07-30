@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,6 +39,7 @@ import com.mobilehub.app.ui.LoadingBox
 import com.mobilehub.app.ui.Octicons
 import com.mobilehub.app.ui.RepoRow
 import com.mobilehub.app.ui.countText
+import com.mobilehub.app.ui.toast
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -55,6 +57,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  */
 @Composable
 fun UserProfileScreen(nav: Nav, login: String) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var user by remember { mutableStateOf<GhUser?>(null) }
     var repos by remember { mutableStateOf(listOf<GhRepo>()) }
@@ -146,7 +149,12 @@ fun UserProfileScreen(nav: Nav, login: String) {
                         Button(
                             onClick = {
                                 scope.launch {
-                                    if (GitHubApi.setFollow(login, !following)) following = !following
+                                    if (GitHubApi.setFollow(login, !following)) {
+                                        following = !following
+                                        toast(context, if (following) "已关注" else "已取消关注")
+                                    } else {
+                                        toast(context, "操作失败，请检查网络或权限")
+                                    }
                                 }
                             },
                             colors = if (following) ButtonDefaults.buttonColors() else ButtonDefaults.buttonColorsPrimary(),

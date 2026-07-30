@@ -1,5 +1,7 @@
 package com.mobilehub.app.ui
 
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,6 +69,11 @@ object GhColors {
         "PHP" -> Color(0xFF4F5D95)
         else -> Color(0xFF858585)
     }
+}
+
+/** 轻量 Toast，用于操作反馈 */
+fun toast(context: Context, msg: String) {
+    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
 }
 
 fun relativeTime(iso: String): String {
